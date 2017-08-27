@@ -271,7 +271,7 @@ Plot the decision tree model
 rpart.plot(modFit2)
 ```
 
-![](Assignment_Course8_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-11-1.png)
+![](unnamed-chunk-11-1.png)
 
 Prediction on the Test Data
 ---------------------------
