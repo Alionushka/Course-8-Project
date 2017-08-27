@@ -211,7 +211,7 @@ The model is 99.29% accurate on the testing data partitioned from the training d
 plot(modFit)
 ```
 
-![](Assignment_Course8_files/figure-markdown_github-ascii_identifiers/unnamed-chunk-9-1.png)
+![](unnamed-chunk-9-1.png)
 
 In the above figure, error rates of the model are plotted over 500 trees. The error rate is less than 0.04 for all 5 classe.
 
