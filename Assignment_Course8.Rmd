@@ -1,0 +1,168 @@
+---
+title: "Course Project"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Assingment
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+
+##Data
+
+The training data for this project are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har. 
+
+
+There are the following five ways that barbell lifts were performed:
+
+* Class A: exactly according to the specification
+
+* Class B: throwing the elbows to the front
+
+* Class C: lifting the dumbbell only halfway
+
+* Class D: lowering the dumbbell only halfway
+
+* Class E: throwing the hips to the front
+
+
+##Objective
+
+The main objective of this report is to summarize the methodology on how to  predict in which manner people performed barbell lifts. The outcome corresponds to the classe variable in the training set. All other variables can be used to explain and predict the outcome. The report is organized as follows. First, the data have been loaded and partitioned for the purpose of Cross-validation. After the datat have been cleaned two models were fitted on the test data. The final prediction is based on the model with highest performance.
+
+##Data Set
+
+The following packages have been used for the purpose of the analysis of this report: 
+```{r, echo=TRUE, warning=FALSE}
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+```
+Load the data into R
+```{r, echo=TRUE, warning=FALSE}
+trainingData_URL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testData_URL <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+# Load the training data 
+train_data <- read.csv(url(trainingData_URL), na.strings=c("NA","#DIV/0!",""))
+# Load the test data 
+test_data <- read.csv(url(testData_URL), na.strings=c("NA","#DIV/0!",""))
+
+# Perform the summary statistics on the classe variable from the Training data 
+summary(train_data$classe)
+```
+
+##Partitioning data for Cross-validation
+
+The training data is split up into two data sets: 60% for training purposes and 40% for testing. The data is partitioned by the classe variable, which is to be predicted. 
+```{r, echo=TRUE, warning=FALSE}
+inTrain <- createDataPartition(y=train_data$classe, p = 0.60, list=FALSE)
+training <- train_data[inTrain,]
+testing <- train_data[-inTrain,]
+dim(training)
+dim(testing)
+```
+##Data Cleaning
+
+First the first 7 variables have been dropped due to the fact that thy have been made up of metadata. It could result in poor performance of the model. 
+```{r, echo=TRUE, warning=FALSE}
+training <- training[,-c(1:7)]
+```
+Remove NearZeroVariance variables
+```{r, echo=TRUE, warning=FALSE}
+nzv <- nearZeroVar(training, saveMetrics=TRUE)
+training <- training[, nzv$nzv==FALSE]
+```
+Drop variables that have 60% or more of the values as 'NA'.
+```{r, echo=TRUE, warning=FALSE}
+training_clean <- training
+for(i in 1:length(training)) {
+  if( sum( is.na( training[, i] ) ) /nrow(training) >= .6) {
+    for(j in 1:length(training_clean)) {
+      if( length( grep(names(training[i]), names(training_clean)[j]) ) == 1)  {
+        training_clean <- training_clean[ , -j]
+      }   
+    } 
+  }
+}
+
+# Rewrite the new clean dataset to be a training data set
+training <- training_clean
+```
+Transform the test_data dataset in the form of training data set
+```{r, echo=TRUE, warning=FALSE}
+columns <- colnames(training)
+columns2 <- colnames(training[, -53])
+test_data <- test_data[columns2]
+dim(test_data)
+```
+
+##Model 1:Random Forest
+
+First the Random Forest model isfitted on the training dataset.Thereafter the results have been evaluated on the test dataset. 
+```{r, echo=TRUE, warning=FALSE}
+set.seed(1)
+modFit1 <- randomForest(classe ~ ., data=training)
+prediction1 <- predict(modFit1, testing)
+cm1 <- confusionMatrix(prediction1, testing$classe)
+print(cm1)
+```
+The model is `r sprintf("%.2f", round(cm1$overall['Accuracy'] * 100, 2))`% accurate based on the fit on the testing dataset partitioned from the training data. Thus based on accuracy the expected out of sample error is `r sprintf("%.2f", round(1 - cm1$overall['Accuracy'],2))`. 
+
+```{r, echo=TRUE, warning=FALSE}
+plot(modFit1)
+```
+
+As can be seen from the plot above the error rates of the model are plotted over 500 trees. In addition the error rate is less than 0.04 for all 5 classe.
+
+
+##Model 2: Decision Tree
+```{r, echo=TRUE, warning=FALSE}
+set.seed(1)
+modFit2 <- rpart(classe ~ ., data=training, method="class")
+prediction2 <- predict(modFit2, testing, type="class")
+cm2 <- confusionMatrix(prediction2, testing$classe)
+print(cm2)
+
+```
+The accuracy of Decision tree model is `r sprintf("%.2f", round(cm2$overall['Accuracy'] * 100, 2))`% on the testing data partitioned from the training data. Thus, the expected out of sample error is `r sprintf("%.2f",  round(1 - cm2$overall['Accuracy'],2))`.
+
+The plot od the decision tree model is presented below
+
+```{r, echo=TRUE, warning=FALSE}
+rpart.plot(modFit2)
+```
+
+##Final Prediction 
+In order to make a decision based on which model to perform the final prediction the accuracy of both models was taken into account. The Random Forest model gave an accuracy of `r sprintf("%.2f", round(cm1$overall['Accuracy'] * 100, 2))`, which is much higher compared to the accuracy from the Decision Tree ( `r sprintf("%.2f", round(cm2$overall['Accuracy'] * 100, 2))`% ). Thus the decision have been made to make use of  Random Forest model to make the predictions on the test data to predict the way 20 participates performed the exercise.
+```{r, echo=TRUE, warning=FALSE}
+pred_FINAL  <- predict(modFit1, test_data, type="class")
+print(pred_FINAL)
+```
+
+## Conclusions
+In this report two models have been performed: a Random Forest and Decision Tree model. Based on accuracy of both models the conclusion have been made. For this data, the Random Forest proved to be a more accurate way to predict the manner in which the exercise was done.
+
+
+
+
+
+
+
+
+
+
+
+
